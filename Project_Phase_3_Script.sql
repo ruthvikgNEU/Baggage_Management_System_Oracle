@@ -1,6 +1,7 @@
 BEGIN
-    EXECUTE IMMEDIATE 'DROP TABLE BAGGAGE_STATUS';
+    
     EXECUTE IMMEDIATE 'DROP TABLE BAGGAGE_DATA';
+    EXECUTE IMMEDIATE 'DROP TABLE BAGGAGE_STATUS';
     EXECUTE IMMEDIATE 'DROP TABLE COMPLAINT';
     EXECUTE IMMEDIATE 'DROP TABLE BAGGAGE';
     EXECUTE IMMEDIATE 'DROP TABLE TICKET';
@@ -18,6 +19,8 @@ EXCEPTION
 END;
 /
 BEGIN
+        EXECUTE IMMEDIATE 'DROP SEQUENCE baggage_STATUS_id_auto';
+        EXECUTE IMMEDIATE 'DROP SEQUENCE baggage_history_id_auto';
         EXECUTE IMMEDIATE 'DROP SEQUENCE  AIRPORT_ID_AUTO' ;
         EXECUTE IMMEDIATE 'DROP SEQUENCE  TERMINAL_ID_AUTO' ;
         EXECUTE IMMEDIATE 'DROP SEQUENCE  booking_code_auto' ;
@@ -26,8 +29,7 @@ BEGIN
         EXECUTE IMMEDIATE 'DROP SEQUENCE  FLIGHT_NUMBER_AUTO' ;
         EXECUTE IMMEDIATE 'DROP SEQUENCE  BAGGAGE_ID_AUTO' ;
         EXECUTE IMMEDIATE 'DROP SEQUENCE COMPLAINT_ID_AUTO';
-        EXECUTE IMMEDIATE 'DROP SEQUENCE baggage_history_id_auto';
-        EXECUTE IMMEDIATE 'DROP SEQUENCE baggage_STATUS_id_auto';
+        
 EXCEPTION
   WHEN OTHERS THEN
     IF SQLCODE != -2289 THEN
@@ -154,23 +156,26 @@ PRIMARY KEY(COMPLAINT_ID),
 CONSTRAINT COMP_BAGGAGE_ID_FK FOREIGN KEY (BAGGAGE_ID) REFERENCES BAGGAGE(BAGGAGE_ID)
 );
  
+ 
+CREATE TABLE BAGGAGE_STATUS(
+STATUS_ID NUMBER(10) DEFAULT baggage_STATUS_id_auto.NEXTVAL NOT NULL,
+STATUS VARCHAR2(20) NOT NULL,
+PRIMARY KEY(STATUS_ID)
+);
+
 create table BAGGAGE_DATA(
 baggage_history_id number(20) default baggage_history_id_auto.nextval not null,
 baggage_id number(10) not null,
-current_status NUMBER(20) not null,
+current_status NUMBER(10) not null,
 last_scan_terminal number(6) not null,
 at_time timestamp not null,
 primary key(baggage_history_id),
-constraint baggage_data_id_fk foreign key (baggage_id) references baggage(baggage_id),
+constraint baggage_id_fk foreign key (baggage_id) references baggage(baggage_id),
 constraint BAGGAGE_DATA_last_scan_terminal_fk foreign key (last_scan_terminal) references terminal(terminal_id),
-CONSTRAINT BAGGAGE_STATUS_FK FOREIGN KEY(CURRENT_STATUS) REFERENCES BAGGAGE_STATUS(STATUS_ID)
+CONSTRAINT BAGGAGE_STATUS_FK FOREIGN KEY (current_status) references BAGGAGE_STATUS(STATUS_ID)
 );
 
 
-CREATE TABLE BAGGAGE_STATUS(
-STATUS_ID NUMBER(10) DEFAULT BAGGAGE_STATUS_ID_AUTO.NEXTVAL NOT NULL,
-STATUS VARCHAR2(30) NOT NULL,
-PRIMARY KEY(STATUS_ID));
 
 
 CREATE OR REPLACE TRIGGER INSERT_TERMINALS
@@ -284,10 +289,10 @@ insert into baggage_data values(baggage_history_id_auto.nextval,2,3,51,systimest
 insert into baggage_data values(baggage_history_id_auto.nextval,1,4,57,systimestamp);
 insert into baggage_data values(baggage_history_id_auto.nextval,2,4,57,systimestamp);
 
-/*
+
 select baggage_id as baggage,concat(concat(bd.current_status,terminal_name),location) as HISTORY, at_time from baggage_data bd,terminal t,airport a where
 t.terminal_id = bd.last_scan_terminal and t.airport_id = a.airport_id order by bd.baggage_history_id;
-*/
+
 commit;
 
 
@@ -299,5 +304,12 @@ SELECT * FROM BAGGAGE;
 
 SELECT * FROM ROUTE;
 
-REPORT FOR UN_CLAIMED BAGGAGES after four days;
+--REPORT FOR UN_CLAIMED BAGGAGES after four days;
+
+
+
+
+
+
+
 

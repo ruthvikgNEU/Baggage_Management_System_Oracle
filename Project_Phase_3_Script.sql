@@ -4,6 +4,7 @@ set serveroutput on;
 
 --Drop Tables if exists
 BEGIN
+EXECUTE IMMEDIATE 'DROP TABLE COMPLAINT_STATUS';
     EXECUTE IMMEDIATE 'DROP TABLE BAGGAGE_DATA';
     EXECUTE IMMEDIATE 'DROP TABLE BAGGAGE_STATUS_TYPE';
     EXECUTE IMMEDIATE 'DROP TABLE COMPLAINT';
@@ -91,7 +92,7 @@ MOBILE VARCHAR2(10) NOT NULL,
 ADDRESS_LINE_1 VARCHAR2(30) NOT NULL,
 ADDRESS_LINE_2 VARCHAR(30),
 CITY VARCHAR2(20)NOT NULL,
-STATE VARCHAR2(10) NOT NULL,
+STATE VARCHAR2(15) NOT NULL,
 COUNTRY VARCHAR2(20)NOT NULL,
 ZIPCODE NUMBER(6) NOT NULL,
 PRIMARY KEY(PASSENGER_ID)
@@ -184,7 +185,11 @@ constraint BAGGAGE_DATA_last_scan_terminal_fk foreign key (last_scan_terminal) r
 CONSTRAINT BAGGAGE_STATUS_FK FOREIGN KEY (current_status) references BAGGAGE_STATUS_TYPE(STATUS_ID) on delete cascade
 );
 
-
+create table complaint_status(
+complaint_status_id number(20) not null,
+status varchar2(10) not null,
+primary key(complaint_status_id)
+);
 
 --Procedure for adding Airport
 create or replace procedure add_airport (
@@ -260,6 +265,17 @@ commit;
 end add_route;
 /
 
+--Procedure for adding new complaint
+create or replace procedure add_complaint(bag_id number,
+status number)
+as
+begin
+INSERT INTO complaint VALUES (complaint_id_auto.NEXTVAL,bag_id,status);
+    DBMS_OUTPUT.PUT_LINE('Complaint Added');
+commit;
+end add_complaint;
+/
+
 
 
 --Procedure for adding bagagge_data.
@@ -269,6 +285,14 @@ begin
 insert into baggage_data values(baggage_history_id_auto.nextval,baggageid,currentstatus,lastscan,cast(sysdate-4 as timestamp));
 commit;
 end add_baggage_data;
+/
+
+create or replace procedure collect_bag(baggageid number)
+as
+begin
+update baggage set is_claimed = 'Y' where baggage_id = baggageid;
+commit;
+end collect_bag;
 /
 create or replace procedure add_passenger(firstname varchar,lastname varchar, passport varchar,
 mobile varchar,
@@ -325,7 +349,7 @@ SELECT ROUTE_CODE INTO i  FROM  TICKET WHERE BOOKING_CODE = (SELECT MAX(BOOKING_
 SELECT FIRST_FLIGHT_NUMBER INTO j FROM ROUTE WHERE ROUTE_CODE = i;
 SELECT SOURCE_TERMINAL_ID INTO x FROM FLIGHT WHERE FLIGHT_NUMBER = j;
 FOR a IN 1..K LOOP
-INSERT INTO BAGGAGE VALUES(BAGGAGE_ID_AUTO.NEXTVAL,X,1,'N',systimestamp,1,'N');
+INSERT INTO BAGGAGE VALUES(BAGGAGE_ID_AUTO.NEXTVAL,X,b,'N',systimestamp,1,'N');
 END LOOP;
     DBMS_OUTPUT.PUT_LINE('Baggages created for Passenger '|| b);
 END;
@@ -400,9 +424,16 @@ t.terminal_id = bd.last_scan_terminal and t.airport_id = a.airport_id and bd.cur
 
 --View for Unclaimed Baggages
 create or replace view un_claimed_bags as
-SELECT * FROM BAGGAGE where baggage_id in (SELECT distinct baggage_id FROM BAGGAGE_DATA WHERE trunc(systimestamp)-trunc(at_time)>3) and  reached_destination = 'Y';
+SELECT * FROM BAGGAGE where baggage_id in (SELECT distinct baggage_id FROM BAGGAGE_DATA WHERE trunc(systimestamp)-trunc(at_time)>3) and  reached_destination = 'Y' and is_claimed <> 'Y';
 
 
+--View for Claimed Baggages
+create or replace view claimed_bags as
+SELECT * FROM BAGGAGE where is_claimed = 'Y';
+
+--View for Complaints
+create or replace view View_Complaints as
+select c.complaint_id,c.baggage_id,cs.status from complaint c,complaint_status cs where c.status = cs.complaint_status_id;
 
 exec add_airport('John F Kennedy','New York');
 exec add_airport('Dallas Fort/Worth','Dallas');
@@ -425,42 +456,205 @@ exec add_flight('BRITISH AIRWAYS',57,51);
 exec add_flight('UNITED AIRLINES',57,46);
 exec add_route(2,3,4);
 exec add_passenger('TOM','CRUISE','A12345','1234567891','HUNTINGTON AVE','ROXBURY','BOSTON','MA','UNITED STATES','02120');
+exec add_passenger('JACK','WILLS','A67891','1011121345','DUDLY STREET','DORCHESTOR','BOSTON','MA','UNITED STATES','02121');
+exec add_passenger('DREDD','FISHER','A78910','1415161718','WASHINGTON STREET','BROOKLINE','NEW YORK','NEW YORK','UNITED STATES','01969');
+exec add_passenger('MANNY','KOSHBIN','A56790','2084228584','MALIBU AVENUE','DUBLIN HOUSE','MIAMI','FLORIDA','UNITED STATES','06321');
+exec add_passenger('DOUG','DEUMORU','A91988','9460089979','CAL TECH STREET','REDWOODS','SAN FRANSISCO','CALIFORNIA','UNITED STATES','45633');
+exec add_passenger('EDWIN','VAN','A78102','8890322311','BRIGHAM STREET','COLOUMBUS AVENUE','NEW HAMPSHIRE','MA','UNITED STATES','36544');
+
+
+exec add_ticket(1,1,5579,3);
+exec add_ticket(1,3,1211,2);
+exec add_ticket(1,2,1322,5);
+exec add_ticket(1,2,3211,4);
 exec add_ticket(1,1,1210,3);
-
-
-
-
-
 
 INSERT INTO BAGGAGE_STATUS_TYPE VALUES(BAGGAGE_STATUS_ID_AUTO.NEXTVAL,'Scanned at ');
 INSERT INTO BAGGAGE_STATUS_TYPE VALUES(BAGGAGE_STATUS_ID_AUTO.NEXTVAL,'Dispatched from ');
 INSERT INTO BAGGAGE_STATUS_TYPE VALUES(BAGGAGE_STATUS_ID_AUTO.NEXTVAL,'Received at ');
 INSERT INTO BAGGAGE_STATUS_TYPE VALUES(BAGGAGE_STATUS_ID_AUTO.NEXTVAL,'Out for Delivery at ');
+insert into complaint_status values(1,'Active');
+insert into complaint_status values(2,'Processing');
+insert into complaint_status values(3,'Closed');
 exec add_baggage_data(1,1,78);
-exec add_baggage_data(2,1,78);
 exec add_baggage_data(1,2,78);
-exec add_baggage_data(2,2,78);
 exec add_baggage_data(1,3,70);
-exec add_baggage_data(2,3,7);
 exec add_baggage_data(1,1,71);
-exec add_baggage_data(2,1,71);
 exec add_baggage_data(1,2,71);
-exec add_baggage_data(2,2,71);
 exec add_baggage_data(1,3,57);
-exec add_baggage_data(2,3,57);
 exec add_baggage_data(1,1,57);
-exec add_baggage_data(2,1,57);
 exec add_baggage_data(1,2,57);
-exec add_baggage_data(2,2,57);
 exec add_baggage_data(1,3,51);
-exec add_baggage_data(2,3,51);
 exec add_baggage_data(1,4,57);
+
+exec add_baggage_data(2,1,78);
+exec add_baggage_data(2,2,78);
+exec add_baggage_data(2,3,70);
+exec add_baggage_data(2,1,71);
+exec add_baggage_data(2,2,71);
+exec add_baggage_data(2,3,57);
+exec add_baggage_data(2,1,57);
+exec add_baggage_data(2,2,57);
+exec add_baggage_data(2,3,51);
 exec add_baggage_data(2,4,57);
-
-
-
-
-
+exec add_baggage_data(3,1,78);
+exec add_baggage_data(3,2,78);
+exec add_baggage_data(3,3,70);
+exec add_baggage_data(3,1,71);
+exec add_baggage_data(3,2,71);
+exec add_baggage_data(3,3,57);
+exec add_baggage_data(3,1,57);
+exec add_baggage_data(3,2,57);
+exec add_baggage_data(3,3,51);
+exec add_baggage_data(3,4,57);
+exec add_baggage_data(4,1,78);
+exec add_baggage_data(4,2,78);
+exec add_baggage_data(4,3,70);
+exec add_baggage_data(4,1,71);
+exec add_baggage_data(4,2,71);
+exec add_baggage_data(4,3,57);
+exec add_baggage_data(4,1,57);
+exec add_baggage_data(4,2,57);
+exec add_baggage_data(4,3,51);
+exec add_baggage_data(4,4,57);
+exec add_baggage_data(5,1,78);
+exec add_baggage_data(5,2,78);
+exec add_baggage_data(5,3,70);
+exec add_baggage_data(5,1,71);
+exec add_baggage_data(5,2,71);
+exec add_baggage_data(5,3,57);
+exec add_baggage_data(5,1,57);
+exec add_baggage_data(5,2,57);
+exec add_baggage_data(5,3,51);
+exec add_baggage_data(5,4,57);
+exec add_baggage_data(6,1,78);
+exec add_baggage_data(6,2,78);
+exec add_baggage_data(6,3,70);
+exec add_baggage_data(6,1,71);
+exec add_baggage_data(6,2,71);
+exec add_baggage_data(6,3,57);
+exec add_baggage_data(6,1,57);
+exec add_baggage_data(6,2,57);
+exec add_baggage_data(6,3,51);
+exec add_baggage_data(6,4,57);
+exec add_baggage_data(7,1,78);
+exec add_baggage_data(7,2,78);
+exec add_baggage_data(7,3,70);
+exec add_baggage_data(7,1,71);
+exec add_baggage_data(7,2,71);
+exec add_baggage_data(7,3,57);
+exec add_baggage_data(7,1,57);
+exec add_baggage_data(7,2,57);
+exec add_baggage_data(7,3,51);
+exec add_baggage_data(7,4,57);
+exec add_baggage_data(8,1,78);
+exec add_baggage_data(8,2,78);
+exec add_baggage_data(8,3,70);
+exec add_baggage_data(8,1,71);
+exec add_baggage_data(8,2,71);
+exec add_baggage_data(8,3,57);
+exec add_baggage_data(8,1,57);
+exec add_baggage_data(8,2,57);
+exec add_baggage_data(8,3,51);
+exec add_baggage_data(8,4,57);
+exec add_baggage_data(9,1,78);
+exec add_baggage_data(9,2,78);
+exec add_baggage_data(9,3,70);
+exec add_baggage_data(9,1,71);
+exec add_baggage_data(9,2,71);
+exec add_baggage_data(9,3,57);
+exec add_baggage_data(9,1,57);
+exec add_baggage_data(9,2,57);
+exec add_baggage_data(9,3,51);
+exec add_baggage_data(9,4,57);
+exec add_baggage_data(10,1,78);
+exec add_baggage_data(10,2,78);
+exec add_baggage_data(10,3,70);
+exec add_baggage_data(10,1,71);
+exec add_baggage_data(10,2,71);
+exec add_baggage_data(10,3,57);
+exec add_baggage_data(10,1,57);
+exec add_baggage_data(10,2,57);
+exec add_baggage_data(10,3,51);
+exec add_baggage_data(10,4,57);
+exec add_baggage_data(11,1,78);
+exec add_baggage_data(11,2,78);
+exec add_baggage_data(11,3,70);
+exec add_baggage_data(11,1,71);
+exec add_baggage_data(11,2,71);
+exec add_baggage_data(11,3,57);
+exec add_baggage_data(11,1,57);
+exec add_baggage_data(11,2,57);
+exec add_baggage_data(11,3,51);
+exec add_baggage_data(11,4,57);
+exec add_baggage_data(12,1,78);
+exec add_baggage_data(12,2,78);
+exec add_baggage_data(12,3,70);
+exec add_baggage_data(12,1,71);
+exec add_baggage_data(12,2,71);
+exec add_baggage_data(12,3,57);
+exec add_baggage_data(12,1,57);
+exec add_baggage_data(12,2,57);
+exec add_baggage_data(12,3,51);
+exec add_baggage_data(12,4,57);
+exec add_baggage_data(13,1,78);
+exec add_baggage_data(13,2,78);
+exec add_baggage_data(13,3,70);
+exec add_baggage_data(13,1,71);
+exec add_baggage_data(13,2,71);
+exec add_baggage_data(13,3,57);
+exec add_baggage_data(13,1,57);
+exec add_baggage_data(13,2,57);
+exec add_baggage_data(13,3,51);
+exec add_baggage_data(13,4,57);
+exec add_baggage_data(14,1,78);
+exec add_baggage_data(14,2,78);
+exec add_baggage_data(14,3,70);
+exec add_baggage_data(14,1,71);
+exec add_baggage_data(14,2,71);
+exec add_baggage_data(14,3,57);
+exec add_baggage_data(14,1,57);
+exec add_baggage_data(14,2,57);
+exec add_baggage_data(14,3,51);
+exec add_baggage_data(14,4,57);
+exec add_baggage_data(15,1,78);
+exec add_baggage_data(15,2,78);
+exec add_baggage_data(15,3,70);
+exec add_baggage_data(15,1,71);
+exec add_baggage_data(15,2,71);
+exec add_baggage_data(15,3,57);
+exec add_baggage_data(15,1,57);
+exec add_baggage_data(15,2,57);
+exec add_baggage_data(15,3,51);
+exec add_baggage_data(15,4,57);
+exec add_baggage_data(16,1,78);
+exec add_baggage_data(16,2,78);
+exec add_baggage_data(16,3,70);
+exec add_baggage_data(16,1,71);
+exec add_baggage_data(16,2,71);
+exec add_baggage_data(16,3,57);
+exec add_baggage_data(16,1,57);
+exec add_baggage_data(16,2,57);
+exec add_baggage_data(16,3,51);
+exec add_baggage_data(16,4,57);
+exec add_baggage_data(17,1,78);
+exec add_baggage_data(17,2,78);
+exec add_baggage_data(17,3,70);
+exec add_baggage_data(17,1,71);
+exec add_baggage_data(17,2,71);
+exec add_baggage_data(17,3,57);
+exec add_baggage_data(17,1,57);
+exec add_baggage_data(17,2,57);
+exec add_baggage_data(17,3,51);
+exec add_baggage_data(17,4,57);
+exec collect_bag(6);
+exec collect_bag(7);
+exec collect_bag(8);
+exec collect_bag(9);
+exec collect_bag(10);
+exec add_complaint(1,1);
+exec add_complaint(2,1);
+exec add_complaint(3,2);
 
 SELECT * FROM AIRPORT;
 SELECT * FROM TERMINAL;
@@ -474,3 +668,5 @@ SELECT * FROM BAGGAGE_DATA;
 EXEC get_baggage_history(1);
 EXEC get_baggage_history(2);
 SELECT * FROM UN_CLAIMED_BAGS;
+select * from claimed_bags;
+select * from view_complaints;

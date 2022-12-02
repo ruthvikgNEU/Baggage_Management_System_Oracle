@@ -936,10 +936,10 @@ EXEC get_baggage_history(2);
 
 select * from claimed_bags;
 select * from view_complaints;
-update baggage set last_scan_time = cast(created_on+2 as timestamp) where baggage_id in (1,2,3,4,5);
-update baggage set last_scan_time = cast(created_on+5 as timestamp) where baggage_id in (11,12,13,14,15,16,17);
-SELECT * FROM UN_CLAIMED_BAGS;
-select* from lost_baggages;
+--update baggage set last_scan_time = cast(created_on+2 as timestamp) where baggage_id in (1,2,3,4,5);
+--update baggage set last_scan_time = cast(created_on+5 as timestamp) where baggage_id in (11,12,13,14,15,16,17);
+--SELECT * FROM UN_CLAIMED_BAGS;
+--select* from lost_baggages;
 --lost baggages in the last week
 --airport with high lost baggages
 --last_week report of unclaimed baggages.

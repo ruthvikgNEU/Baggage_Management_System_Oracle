@@ -198,13 +198,23 @@ primary key(complaint_status_id)
 create or replace procedure add_airport (
 in_name varchar,
 in_location varchar) AS
- BEGIN
-    insert into airport values(airport_id_auto.nextval,in_name,in_location);
-    DBMS_OUTPUT.PUT_LINE('Airport Added');
-    commit;
-  END add_airport;
-/
+v_count number;
+e_unique_name exception;
+BEGIN
+select count(*) into v_count from airport where name=in_name;
+if(v_count=0) then
+insert into airport values(airport_id_auto.nextval,in_name,in_location);
+DBMS_OUTPUT.PUT_LINE('Airport Added');
+else
+raise e_unique_name;
+end if;
 commit;
+exception
+when e_unique_name then DBMS_OUTPUT.PUT_LINE('The airport already exists');
+when others then raise;
+commit;
+END add_airport;
+/
 
 
 
@@ -288,8 +298,23 @@ end add_baggage_data;
 
 create or replace procedure collect_bag(baggageid number)
 as
+v_isreached varchar(1);
+v_collected varchar(1);
+e_notreached exception;
+e_collected exception;
 begin
+select reached_destination into v_isreached from baggage where baggage_id=baggageid;
+select is_claimed into v_collected from baggage where baggage_id=baggageid;
+if(v_collected='Y') then raise e_collected;
+elsif(v_isreached='Y') then
 update baggage set is_claimed = 'Y' where baggage_id = baggageid;
+dbms_output.put_line('Baggage '||baggageid||' collected');
+else raise e_notreached;
+end if;
+exception
+when e_collected then dbms_output.put_line('Baggage collected already');
+when e_notreached then dbms_output.put_line('Cannot collect a bag which has not reached destination');
+when others then raise;
 commit;
 end collect_bag;
 /
@@ -465,7 +490,7 @@ exec add_airport('Shivaji INTL','Mumbai');
 exec add_airport('Heathrow INTL','London');
 exec add_airport('OHare International Airport','Chicago');
 exec add_airport('Dulles INTL','Washington D.C.');
-exec add_airport('Hartsfield–Jackson','Atlanta');
+exec add_airport('HartsfieldÂ–Jackson','Atlanta');
 exec add_airport('Schipol INTL','Amsterdam');
 exec add_airport('Hamad INTL','Doha');
 exec add_flight('QATAR AIRWAYS',80,78);

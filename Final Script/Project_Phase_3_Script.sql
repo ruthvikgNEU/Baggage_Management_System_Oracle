@@ -1,10 +1,8 @@
 set serveroutput on;
 
-
-
 --Drop Tables if exists
 BEGIN
-EXECUTE IMMEDIATE 'DROP TABLE COMPLAINT_STATUS';
+    EXECUTE IMMEDIATE 'DROP TABLE COMPLAINT_STATUS';
     EXECUTE IMMEDIATE 'DROP TABLE BAGGAGE_DATA';
     EXECUTE IMMEDIATE 'DROP TABLE BAGGAGE_STATUS_TYPE';
     EXECUTE IMMEDIATE 'DROP TABLE COMPLAINT';
@@ -15,7 +13,6 @@ EXECUTE IMMEDIATE 'DROP TABLE COMPLAINT_STATUS';
     EXECUTE IMMEDIATE 'DROP TABLE FLIGHT';
     EXECUTE IMMEDIATE 'DROP TABLE TERMINAL';
     EXECUTE IMMEDIATE 'DROP TABLE AIRPORT';
-   
 EXCEPTION
    WHEN OTHERS THEN
       IF SQLCODE != -942 THEN
@@ -37,8 +34,7 @@ BEGIN
         EXECUTE IMMEDIATE 'DROP SEQUENCE  route_code_auto' ;
         EXECUTE IMMEDIATE 'DROP SEQUENCE  FLIGHT_NUMBER_AUTO' ;
         EXECUTE IMMEDIATE 'DROP SEQUENCE  BAGGAGE_ID_AUTO' ;
-        EXECUTE IMMEDIATE 'DROP SEQUENCE COMPLAINT_ID_AUTO';
-        
+        EXECUTE IMMEDIATE 'DROP SEQUENCE COMPLAINT_ID_AUTO';        
 EXCEPTION
   WHEN OTHERS THEN
     IF SQLCODE != -2289 THEN
@@ -46,7 +42,6 @@ EXCEPTION
     END IF;
 END;
 /
-
 
 
 --Create Sequences
@@ -198,121 +193,26 @@ primary key(complaint_status_id)
 create or replace procedure add_airport (
 in_name varchar,
 in_location varchar) AS
- BEGIN
-    insert into airport values(airport_id_auto.nextval,in_name,in_location);
-    DBMS_OUTPUT.PUT_LINE('Airport Added');
-    commit;
-  END add_airport;
-/
+v_count number;
+e_unique_name exception;
+BEGIN
+select count(*) into v_count from airport where name=in_name;
+if(v_count=0) then
+insert into airport values(airport_id_auto.nextval,in_name,in_location);
+DBMS_OUTPUT.PUT_LINE('Airport Added');
+else
+raise e_unique_name;
+end if;
 commit;
-
-
-
-
-
-
---Procedure for Adding Flights
-create or replace procedure add_flight(airlines varchar,
-source_terminal number,
-dest_terminal number)
-as
-begin
-insert into flight values(flight_number_auto.nextval,airlines,sysdate,source_terminal,dest_terminal);
-    DBMS_OUTPUT.PUT_LINE('Flight Added');
+exception
+when e_unique_name then DBMS_OUTPUT.PUT_LINE('The airport already exists');
+when others then raise;
 commit;
-end add_flight;
+END add_airport;
 /
 
 
-
---Procedure for getting the baggage_history for a particular bag based on baggage_id.
-create or replace procedure get_baggage_history(in_id number)
-is
-begin
-for bag in (select baggage_id as baggage,concat(concat(bt.status,terminal_name),location) as HISTORY, at_time as in_time from baggage_data bd,terminal t,airport a,baggage_status_type bt where
-t.terminal_id = bd.last_scan_terminal and t.airport_id = a.airport_id and bd.current_status = bt.status_id and baggage_id = in_id order by bd.baggage_history_id)
-loop
-dbms_output.put_line(bag.baggage || ' '||bag.history||' at '||bag.in_time);
-end loop;
-commit;
-end get_baggage_history;
-/
---Procedure for adding new ticket
-create or replace procedure add_ticket(route_code number,
-passenger_id number,
-price number,
-no_of_bags number)
-as
-begin
-INSERT INTO TICKET VALUES(booking_code_auto.NEXTVAL,route_code,passenger_id,price,no_of_bags);
-    DBMS_OUTPUT.PUT_LINE('Ticket Added');
-commit;
-end add_ticket;
-/
-
---Procedure for adding new route
-create or replace procedure add_route(first number,
-second number,
-third number)
-as
-begin
-INSERT INTO ROUTE VALUES (ROUTE_CODE_AUTO.NEXTVAL,first,second,third);
-    DBMS_OUTPUT.PUT_LINE('Route Added');
-commit;
-end add_route;
-/
-
---Procedure for adding new complaint
-create or replace procedure add_complaint(bag_id number,
-status number)
-as
-begin
-INSERT INTO complaint VALUES (complaint_id_auto.NEXTVAL,bag_id,status);
-    DBMS_OUTPUT.PUT_LINE('Complaint Added');
-commit;
-end add_complaint;
-/
-
-
-
---Procedure for adding bagagge_data.
-create or replace procedure add_baggage_data(baggageid number,currentstatus number, lastscan number)
-as
-v_cdate date;
-begin
-select created_on into v_cdate from baggage where baggage_id = baggageid;
-insert into baggage_data values(baggage_history_id_auto.nextval,baggageid,currentstatus,lastscan,cast(v_cdate+2 as timestamp));
-commit;
-end add_baggage_data;
-/
-
-create or replace procedure collect_bag(baggageid number)
-as
-begin
-update baggage set is_claimed = 'Y' where baggage_id = baggageid;
-commit;
-end collect_bag;
-/
-create or replace procedure add_passenger(firstname varchar,lastname varchar, passport varchar,
-mobile varchar,
-address1 varchar,
-address2 varchar,
-city varchar,
-state varchar,
-country varchar,
-zipcode number
-)
-as
-begin
-INSERT INTO PASSENGER VALUES(PASSENEGER_ID_AUTO.NEXTVAL,firstname,lastname,passport,mobile,address1,address2,city,state,country,zipcode);
-    DBMS_OUTPUT.PUT_LINE('Passenger Added');
-commit;
-end add_passenger;
-/
-
-
-
---Trigger to automatically generate terminal for each airport
+--Trigger to automatically generate terminal for each Airport
 CREATE OR REPLACE TRIGGER INSERT_TERMINALS
 AFTER INSERT ON AIRPORT
 DECLARE
@@ -329,6 +229,35 @@ INSERT INTO TERMINAL VALUES(TERMINAL_ID_AUTO.nextval,i,'Terminal-F in ');
 END;
 /
 
+
+
+--Procedure for adding Flights
+create or replace procedure add_flight(airlines varchar,
+source_terminal number,
+dest_terminal number)
+as
+begin
+insert into flight values(flight_number_auto.nextval,airlines,sysdate,source_terminal,dest_terminal);
+    DBMS_OUTPUT.PUT_LINE('Flight Added');
+commit;
+end add_flight;
+/
+
+
+
+
+--Procedure for adding new Ticket
+create or replace procedure add_ticket(route_code number,
+passenger_id number,
+price number,
+no_of_bags number)
+as
+begin
+INSERT INTO TICKET VALUES(booking_code_auto.NEXTVAL,route_code,passenger_id,price,no_of_bags);
+    DBMS_OUTPUT.PUT_LINE('Ticket Added');
+commit;
+end add_ticket;
+/
 
 
 --Trigger to create baggages data automatically when ticket is created.
@@ -348,14 +277,13 @@ SELECT NO_BAGS INTO k FROM TICKET WHERE BOOKING_CODE = b;
 SELECT ROUTE_CODE INTO i  FROM  TICKET WHERE BOOKING_CODE = (SELECT MAX(BOOKING_CODE) FROM TICKET);
 SELECT FIRST_FLIGHT_NUMBER INTO j FROM ROUTE WHERE ROUTE_CODE = i;
 SELECT SOURCE_TERMINAL_ID INTO x FROM FLIGHT WHERE FLIGHT_NUMBER = j;
-SELECT DBMS_RANDOM.value(6,7) INTO rand from dual;
+SELECT DBMS_RANDOM.value(2,13) INTO rand from dual;
 FOR a IN 1..K LOOP
 INSERT INTO BAGGAGE VALUES(BAGGAGE_ID_AUTO.NEXTVAL,X,b,'N',systimestamp,i,'N',sysdate-rand);
 END LOOP;
     DBMS_OUTPUT.PUT_LINE('Baggages created for Passenger '|| b);
 END;
 /
-
 
 
 
@@ -376,7 +304,46 @@ END;
 
 
 
---trigger to update last_scan_terminal_id for each  baggage.
+--Procedure for adding new Route
+create or replace procedure add_route(first number,
+second number,
+third number)
+as
+begin
+INSERT INTO ROUTE VALUES (ROUTE_CODE_AUTO.NEXTVAL,first,second,third);
+    DBMS_OUTPUT.PUT_LINE('Route Added');
+commit;
+end add_route;
+/
+
+--Procedure for adding new Complaint
+create or replace procedure add_complaint(bag_id number,
+status number)
+as
+begin
+INSERT INTO complaint VALUES (complaint_id_auto.NEXTVAL,bag_id,status);
+    DBMS_OUTPUT.PUT_LINE('Complaint Added');
+commit;
+end add_complaint;
+/
+
+
+
+--Procedure for adding Baggage_data.
+create or replace procedure add_baggage_data(baggageid number,currentstatus number, lastscan number)
+as
+v_cdate date;
+begin
+select created_on into v_cdate from baggage where baggage_id = baggageid;
+insert into baggage_data values(baggage_history_id_auto.nextval,baggageid,currentstatus,lastscan,cast(v_cdate+2 as timestamp));
+commit;
+end add_baggage_data;
+/
+
+
+
+
+--Trigger to update last_scan_terminal_id in Baggage.
 CREATE OR REPLACE TRIGGER UPDATE_LAST_SCAN_TERMINAL_IN_BAGGAGE
 AFTER INSERT ON BAGGAGE_DATA
 DECLARE
@@ -392,6 +359,7 @@ END;
 /
 
 
+--Trigger to update last_scan_time in Baggage
 create or replace trigger update_last_scan_time_in_baggage
 after insert on baggage_data
 declare
@@ -426,6 +394,66 @@ UPDATE BAGGAGE SET REACHED_DESTINATION = 'Y' WHERE BAGGAGE_ID = j;
 DBMS_OUTPUT.put_line('For Baggage-> '|| j || ' '|| x || ' ' || i);
 END IF;
 END;
+/
+
+
+
+--Procedure for collecting a Bag
+create or replace procedure collect_bag(baggageid number)
+as
+v_isreached varchar(1);
+v_collected varchar(1);
+e_notreached exception;
+e_collected exception;
+begin
+select reached_destination into v_isreached from baggage where baggage_id=baggageid;
+select is_claimed into v_collected from baggage where baggage_id=baggageid;
+if(v_collected='Y') then raise e_collected;
+elsif(v_isreached='Y') then
+update baggage set is_claimed = 'Y' where baggage_id = baggageid;
+dbms_output.put_line('Baggage '||baggageid||' collected');
+else raise e_notreached;
+end if;
+exception
+when e_collected then dbms_output.put_line('Baggage collected already');
+when e_notreached then dbms_output.put_line('Cannot collect a bag which has not reached destination');
+when others then raise;
+commit;
+end collect_bag;
+/
+
+
+
+--Procedure for adding a new Passenger
+create or replace procedure add_passenger(firstname varchar,lastname varchar, passport varchar,
+mobile varchar,
+address1 varchar,
+address2 varchar,
+city varchar,
+state varchar,
+country varchar,
+zipcode number
+)
+as
+begin
+INSERT INTO PASSENGER VALUES(PASSENEGER_ID_AUTO.NEXTVAL,firstname,lastname,passport,mobile,address1,address2,city,state,country,zipcode);
+    DBMS_OUTPUT.PUT_LINE('Passenger Added');
+commit;
+end add_passenger;
+/
+
+
+--Procedure for getting the baggage_history for a particular bag based on baggage_id.
+create or replace procedure get_baggage_history(in_id number)
+is
+begin
+for bag in (select baggage_id as baggage,concat(concat(bt.status,terminal_name),location) as HISTORY, at_time as in_time from baggage_data bd,terminal t,airport a,baggage_status_type bt where
+t.terminal_id = bd.last_scan_terminal and t.airport_id = a.airport_id and bd.current_status = bt.status_id and baggage_id = in_id order by bd.baggage_history_id)
+loop
+dbms_output.put_line(bag.baggage || ' '||bag.history||' at '||bag.in_time);
+end loop;
+commit;
+end get_baggage_history;
 /
 
 
@@ -465,7 +493,7 @@ exec add_airport('Shivaji INTL','Mumbai');
 exec add_airport('Heathrow INTL','London');
 exec add_airport('OHare International Airport','Chicago');
 exec add_airport('Dulles INTL','Washington D.C.');
-exec add_airport('Hartsfield–Jackson','Atlanta');
+exec add_airport('HartsfieldÂ–Jackson','Atlanta');
 exec add_airport('Schipol INTL','Amsterdam');
 exec add_airport('Hamad INTL','Doha');
 exec add_flight('QATAR AIRWAYS',80,78);
@@ -887,7 +915,7 @@ exec add_baggage_data(33,1,5);
 --exec add_baggage_data(33,4,20);
 
 
-
+exec collect_bag(25);
 exec collect_bag(6);
 exec collect_bag(7);
 exec collect_bag(8);
@@ -911,14 +939,13 @@ EXEC get_baggage_history(2);
 
 select * from claimed_bags;
 select * from view_complaints;
-update baggage set last_scan_time = cast(created_on+2 as timestamp) where baggage_id in (1,2,3,4,5);
-update baggage set last_scan_time = cast(created_on+5 as timestamp) where baggage_id in (11,12,13,14,15,16,17);
-SELECT * FROM UN_CLAIMED_BAGS;
-select* from lost_baggages;
+--update baggage set last_scan_time = cast(created_on+2 as timestamp) where baggage_id in (1,2,3,4,5);
+--update baggage set last_scan_time = cast(created_on+5 as timestamp) where baggage_id in (11,12,13,14,15,16,17);
+--SELECT * FROM UN_CLAIMED_BAGS;
+--select* from lost_baggages;
 --lost baggages in the last week
 --airport with high lost baggages
 --last_week report of unclaimed baggages.
-
 
 
 
